@@ -5,6 +5,9 @@ project:
     - "[0-9][0-9][0-9][0-9]-*/*.qmd"
     - "!_template/"
 
+execute:
+  freeze: auto
+
 website:
   description: "A blog built with Quarto"
   site-url: https://your-website-url.example.com # you must change this appropriately for RSS feeds to work properly

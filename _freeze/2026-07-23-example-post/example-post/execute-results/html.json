@@ -1,0 +1,17 @@
+{
+  "hash": "f673692ece88d5a1f97f6a5cf8fd5f87",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: \"Example Post\"\ndescription: \"A sample post demonstrating the folder convention and listing page.\"\nauthor: \"Your Name\"\ndate: 2026-07-23\ncategories: [example]\n---\n\n## Introduction\n\nThis is a sample post showing how post subdirectories are named\n(`YYYY-MM-DD-slug/`) and how the `.qmd` file, along with any figures\nor data for the post, lives directly inside that directory.\n\n\n\n\n::: {.cell}\n\n```{.r .cell-code}\nggplot(mtcars, aes(wt, mpg)) +\n  geom_point()\n```\n\n::: {.cell-output-display}\n![A simple example chart.](example-post_files/figure-html/example-chart-1.png){width=672}\n:::\n:::\n\n",
+    "supporting": [
+      "example-post_files"
+    ],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}
