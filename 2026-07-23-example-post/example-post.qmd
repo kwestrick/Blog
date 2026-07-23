@@ -1,0 +1,28 @@
+---
+title: "Example Post"
+description: "A sample post demonstrating the folder convention and listing page."
+author: "Your Name"
+date: 2026-07-23
+categories: [example]
+---
+
+## Introduction
+
+This is a sample post showing how post subdirectories are named
+(`YYYY-MM-DD-slug/`) and how the `.qmd` file, along with any figures
+or data for the post, lives directly inside that directory.
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+```
+
+```{r}
+#| label: example-chart
+#| fig-cap: "A simple example chart."
+
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point()
+```

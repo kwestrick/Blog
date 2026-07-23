@@ -1,0 +1,17 @@
+---
+title: "Blog"
+listing:
+  # Matches post subdirectories named YYYY-MM-DD-slug/ at the top level
+  # (the leading underscore on _template/ excludes it automatically)
+  contents: "[0-9][0-9][0-9][0-9]-*/*.qmd"
+  feed: true
+  sort: "date desc"
+  type: default
+  categories: true
+  sort-ui: false
+  filter-ui: false
+page-layout: full
+title-block-banner: true
+---
+
+
