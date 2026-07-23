@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Warn (without blocking) if any .qmd file has changed more recently
+# than manifest.json, since that usually means R package dependencies
+# may have changed too.
+#
+# Enable once per clone with:
+#   git config core.hooksPath .githooks
+
+repo_root=$(git rev-parse --show-toplevel)
+manifest="${repo_root}/manifest.json"
+
+if [[ ! -f "$manifest" ]]; then
+  echo "Warning: manifest.json not found. Run rsconnect::writeManifest() before publishing to Connect Cloud." >&2
+  exit 0
+fi
+
+manifest_mtime=$(stat -f %m "$manifest" 2>/dev/null || stat -c %Y "$manifest")
+
+newer_files=()
+while IFS= read -r -d '' file; do
+  file_mtime=$(stat -f %m "$file" 2>/dev/null || stat -c %Y "$file")
+  if [[ "$file_mtime" -gt "$manifest_mtime" ]]; then
+    newer_files+=("$file")
+  fi
+done < <(find "$repo_root" -name '*.qmd' -not -path '*/_template/*' -print0)
+
+if [[ ${#newer_files[@]} -gt 0 ]]; then
+  echo "----------------------------------------------------------------------" >&2
+  echo "Reminder: the following .qmd file(s) changed after manifest.json was" >&2
+  echo "last generated. If you added/updated/removed an R package, run:" >&2
+  echo "  rsconnect::writeManifest()" >&2
+  echo "then commit and push the updated manifest.json." >&2
+  for f in "${newer_files[@]}"; do
+    echo "  - ${f#$repo_root/}" >&2
+  done
+  echo "----------------------------------------------------------------------" >&2
+fi
+
+exit 0

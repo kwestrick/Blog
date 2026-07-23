@@ -38,3 +38,5 @@ sed -i '' "s/^title: \"Post Title\"/title: \"${title}\"/" "$dest_file"
 sed -i '' "s/^date: today/date: ${date_prefix}/" "$dest_file"
 
 echo "Created ${post_dir}/$(basename "$dest_file")"
+echo "Reminder: if this post uses any new R packages, run rsconnect::writeManifest()" \
+     "and commit the updated manifest.json before pushing."
