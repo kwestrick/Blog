@@ -4,7 +4,7 @@ library(dplyr)
 library(stringr)
 library(DT)
 
-registry_path <- "docs/blog_registry.csv"
+registry_path <- "../docs/blog_registry.csv"
 
 read_blog_registry <- function(path = registry_path) {
   read_csv(path, show_col_types = FALSE) %>%
