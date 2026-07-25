@@ -4,8 +4,23 @@ library(dplyr)
 library(stringr)
 library(DT)
 
-registry_path <- "../docs/blog_registry.csv"
-blog_root <- normalizePath(file.path(dirname(registry_path), ".."), mustWork = FALSE)
+# Detect environment: TRUE when running locally, FALSE when deployed to Connect Cloud
+is_local    <- file.exists("../docs/blog_registry.csv")
+registry_path <- if (is_local) "../docs/blog_registry.csv" else "blog_registry.csv"
+blog_root   <- normalizePath(file.path(dirname(registry_path), ".."), mustWork = FALSE)
+
+# Credentials — only used in cloud deployment
+credentials <- list(
+  admin = "grunt11B!",
+  ken   = "ken321Neth!",
+  anton = "an321Ton!"
+)
+
+check_login <- function(user, password) {
+  isTRUE(credentials[[user]] == password)
+}
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
 slugify <- function(title) {
   title %>%
@@ -15,7 +30,6 @@ slugify <- function(title) {
 }
 
 generate_post_id <- function(existing_ids) {
-  # Start numbering after the highest existing numeric ID
   numeric_ids <- suppressWarnings(as.integer(existing_ids))
   max_id <- max(numeric_ids, 0L, na.rm = TRUE)
   as.character(seq(max_id + 1, length.out = length(existing_ids)))
@@ -24,27 +38,25 @@ generate_post_id <- function(existing_ids) {
 read_blog_registry <- function(path = registry_path) {
   df <- read_csv(path, show_col_types = FALSE) %>%
     mutate(
-      draft_started = as.Date(draft_started),
+      draft_started  = as.Date(draft_started),
       published_date = as.Date(published_date),
-      post_id = as.character(post_id),
-      post_id = coalesce(post_id, ""),
-      title = coalesce(title, ""),
-      lead_quote = coalesce(lead_quote, ""),
-      gist = coalesce(gist, ""),
-      publication = str_trim(tolower(coalesce(publication, ""))),
-      status = str_trim(tolower(coalesce(status, ""))),
-      path = coalesce(path, ""),
-      chart_path = coalesce(chart_path, ""),
-      image_path = coalesce(image_path, ""),
-      notes = coalesce(notes, ""),
-      tags = coalesce(tags, "")
+      post_id        = as.character(post_id),
+      post_id        = coalesce(post_id, ""),
+      title          = coalesce(title, ""),
+      lead_quote     = coalesce(lead_quote, ""),
+      gist           = coalesce(gist, ""),
+      publication    = str_trim(tolower(coalesce(publication, ""))),
+      status         = str_trim(tolower(coalesce(status, ""))),
+      path           = coalesce(path, ""),
+      chart_path     = coalesce(chart_path, ""),
+      image_path     = coalesce(image_path, ""),
+      notes          = coalesce(notes, ""),
+      tags           = coalesce(tags, "")
     ) %>%
     mutate(
       publication = if_else(publication == "", "unassigned", publication),
-      status = if_else(status == "", "unassigned", status)
+      status      = if_else(status == "", "unassigned", status)
     )
-
-  # Auto-generate post_ids for any rows missing them
 
   missing_ids <- which(df$post_id == "" | is.na(df$post_id))
   if (length(missing_ids) > 0) {
@@ -59,7 +71,21 @@ write_blog_registry <- function(df, path = registry_path) {
   write_csv(df, path, na = "")
 }
 
-ui <- fluidPage(
+# ── UI ────────────────────────────────────────────────────────────────────────
+
+login_ui <- fluidPage(
+  tags$div(
+    style = "max-width: 360px; margin: 120px auto; padding: 32px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa;",
+    h3("Blog Dashboard", style = "text-align: center; margin-bottom: 24px;"),
+    textInput("login_user", "Username", width = "100%"),
+    passwordInput("login_pass", "Password", width = "100%"),
+    actionButton("login_btn", "Sign in", class = "btn-primary", width = "100%"),
+    br(), br(),
+    textOutput("login_error")
+  )
+)
+
+main_ui <- fluidPage(
   tags$head(
     tags$script(HTML("
       $(document).on('change', '.status-select, .publication-select', function() {
@@ -83,332 +109,373 @@ ui <- fluidPage(
     "))
   ),
   titlePanel("Ken's Blog Workflow Dashboard"),
-  
+
   sidebarLayout(
     sidebarPanel(
       actionButton("refresh", "Refresh data"),
       br(), br(),
-      
-      textInput("new_post_title", "New post title"),
-      actionButton("scaffold_post", "Create new post"),
-      textOutput("scaffold_status"),
-      br(), br(),
-      
+
+      # Local: new post scaffolding
+      if (is_local) tagList(
+        textInput("new_post_title", "New post title"),
+        actionButton("scaffold_post", "Create new post"),
+        textOutput("scaffold_status"),
+        br(), br()
+      ),
+
+      # Cloud: CSV download + sign out + note
+      if (!is_local) tagList(
+        downloadButton("download_csv", "Download registry CSV"),
+        br(), br(),
+        actionButton("sign_out", "Sign out", class = "btn-danger", width = "100%"),
+        hr(),
+        tags$div(
+          style = "padding: 10px; background-color: #fff3cd; border-radius: 4px; margin-bottom: 15px;",
+          tags$strong("Note:"), " New posts must be created locally using ",
+          tags$code("./new_post.sh"), " or the local Shiny app."
+        ),
+        br()
+      ),
+
       selectInput("status_filter", "Status", choices = NULL, multiple = TRUE),
       selectInput("publication_filter", "Publication", choices = NULL, multiple = TRUE),
       textInput("search_text", "Search title / gist / tags", value = ""),
       checkboxInput("missing_only", "Show only posts missing key metadata", value = FALSE),
-      
+
       width = 2
     ),
-    
+
     mainPanel(
       fluidRow(
-        column(3, wellPanel(h4("Total posts"), textOutput("total_posts"))),
-        column(3, wellPanel(h4("Published"), textOutput("published_posts"))),
-        column(3, wellPanel(h4("Unpublished"), textOutput("unpublished_posts"))),
-        column(3, wellPanel(h4("Missing fields"), textOutput("missing_posts")))
+        column(3, wellPanel(h4("Total posts"),    textOutput("total_posts"))),
+        column(3, wellPanel(h4("Published"),       textOutput("published_posts"))),
+        column(3, wellPanel(h4("Unpublished"),     textOutput("unpublished_posts"))),
+        column(3, wellPanel(h4("Missing fields"),  textOutput("missing_posts")))
       ),
-      
+
       tabsetPanel(
         id = "main_tabs",
+
         tabPanel(
           "Posts",
           br(),
           DTOutput("posts_table")
         ),
-        
+
         tabPanel(
           "Edit selected post",
           br(),
           actionButton("back_to_posts", "← Back to Posts"),
           br(), br(),
           verbatimTextOutput("selected_post_id"),
-          
+
           textInput("edit_title", "Title", width = "100%"),
           textAreaInput("edit_lead_quote", "Lead quote", rows = 3, width = "100%"),
           textAreaInput("edit_gist", "Gist", rows = 4, width = "100%"),
-          
+
           fluidRow(
-            column(6, dateInput("edit_draft_started", "Draft started")),
+            column(6, dateInput("edit_draft_started",  "Draft started")),
             column(6, dateInput("edit_published_date", "Published date"))
           ),
-          
+
           fluidRow(
-            column(6,
-                   selectInput(
-                     "edit_status",
-                     "Status",
-                     choices = c("idea", "drafting", "editing", "scheduled", "published", "unassigned")
-                   )
-            ),
-            column(6,
-                   selectInput(
-                     "edit_publication",
-                     "Publication",
-                     choices = c("unassigned", "substack", "website", "both")
-                   )
-            )
+            column(6, selectInput("edit_status", "Status",
+              choices = c("idea", "drafting", "editing", "scheduled", "published", "unassigned"))),
+            column(6, selectInput("edit_publication", "Publication",
+              choices = c("unassigned", "substack", "website", "both")))
           ),
-          
-          textInput("edit_path", "Path", width = "100%"),
+
+          textInput("edit_path",       "Path", width = "100%"),
           textInput("edit_chart_path", "Chart / graph / map / table path", width = "100%"),
           textInput("edit_image_path", "Image / photo path", width = "100%"),
-          textInput("edit_tags", "Tags (semicolon-separated)", width = "100%"),
-          textAreaInput("edit_notes", "Notes", rows = 5),
-          
+          textInput("edit_tags",       "Tags (semicolon-separated)", width = "100%"),
+          textAreaInput("edit_notes",  "Notes", rows = 5),
+
           fluidRow(
             column(4, actionButton("load_selected", "Load selected post")),
-            column(4, actionButton("save_changes", "Save changes")),
-            column(4, actionButton("clear_form", "Clear form"))
+            column(4, actionButton("save_changes",  "Save changes")),
+            column(4, actionButton("clear_form",    "Clear form"))
           ),
-          
+
           br(),
           textOutput("save_status")
         ),
-        
-        tabPanel(
-          "Status summary",
-          br(),
-          tableOutput("status_summary")
-        ),
-        
-        tabPanel(
-          "Publication summary",
-          br(),
-          tableOutput("publication_summary")
-        )
+
+        tabPanel("Status summary",      br(), tableOutput("status_summary")),
+        tabPanel("Publication summary", br(), tableOutput("publication_summary"))
       )
     )
   )
 )
 
+# Local: go straight to the app; Cloud: show login screen first
+ui <- if (is_local) main_ui else uiOutput("page_ui")
+
+# ── Server ────────────────────────────────────────────────────────────────────
+
 server <- function(input, output, session) {
-  
-  blog_data <- reactiveVal(read_blog_registry())
-  selected_post_id <- reactiveVal(NULL)
-  
-  observe({
-    df <- blog_data()
-    
-    updateSelectInput(
-      session, "status_filter",
-      choices = sort(unique(df$status)),
-      selected = sort(unique(df$status))
+
+  # Local: start authenticated; Cloud: require login
+  authenticated <- reactiveVal(is_local)
+
+  # Cloud-only: login / logout / CSV download
+  if (!is_local) {
+    output$page_ui <- renderUI({
+      if (authenticated()) main_ui else login_ui
+    })
+
+    output$login_error <- renderText("")
+
+    observeEvent(input$login_btn, {
+      if (check_login(input$login_user, input$login_pass)) {
+        authenticated(TRUE)
+      } else {
+        output$login_error <- renderText("Incorrect username or password.")
+      }
+    })
+
+    observeEvent(input$sign_out, {
+      authenticated(FALSE)
+    })
+
+    output$download_csv <- downloadHandler(
+      filename = function() paste0("blog_registry_", Sys.Date(), ".csv"),
+      content  = function(file) write_csv(blog_data(), file, na = "")
     )
-    
-    updateSelectInput(
-      session, "publication_filter",
-      choices = sort(unique(df$publication)),
-      selected = sort(unique(df$publication))
-    )
+  }
+
+  # ── Data ────────────────────────────────────────────────────────────────────
+
+  blog_data         <- reactiveVal(NULL)
+  selected_post_id  <- reactiveVal(NULL)
+
+  observeEvent(authenticated(), {
+    req(authenticated())
+    blog_data(read_blog_registry())
   })
-  
+
+  observe({
+    req(authenticated())
+    df <- blog_data()
+    if (is.null(df) || nrow(df) == 0) return()
+    updateSelectInput(session, "status_filter",
+      choices = sort(unique(df$status)), selected = sort(unique(df$status)))
+    updateSelectInput(session, "publication_filter",
+      choices = sort(unique(df$publication)), selected = sort(unique(df$publication)))
+  })
+
   observeEvent(input$refresh, {
     blog_data(read_blog_registry())
   })
-  
+
   observeEvent(input$back_to_posts, {
     updateTabsetPanel(session, "main_tabs", selected = "Posts")
   })
-  
-  scaffold_msg <- reactiveVal("")
-  
-  observeEvent(input$scaffold_post, {
-    title <- str_trim(input$new_post_title)
-    
-    if (title == "") {
-      scaffold_msg("Please enter a post title.")
-      return()
-    }
-    
-    script_path <- normalizePath(file.path(dirname(registry_path), "..", "new_post.sh"))
-    result <- system2("bash", args = c(script_path, shQuote(title)), stdout = TRUE, stderr = TRUE)
-    
-    # Add new post to the registry
-    df <- blog_data()
-    date_prefix <- format(Sys.Date(), "%Y-%m-%d")
-    slug <- title %>%
-      str_to_lower() %>%
-      str_replace_all("[_ ]", "-") %>%
-      str_remove_all("[^a-z0-9-]")
-    year <- format(Sys.Date(), "%Y")
-    post_path <- paste0("posts/", year, "/", date_prefix, "-", slug)
-    
-    new_row <- tibble(
-      post_id = as.character(max(as.integer(df$post_id), na.rm = TRUE) + 1L),
-      title = title,
-      lead_quote = "", gist = "",
-      draft_started = as.character(Sys.Date()),
-      published_date = NA_character_,
-      status = "idea", publication = "unassigned",
-      path = post_path,
-      chart_path = "", image_path = "",
-      tags = "", notes = ""
-    )
-    
-    df <- bind_rows(df, new_row)
-    write_blog_registry(df, registry_path)
-    blog_data(read_blog_registry())
-    
-    updateTextInput(session, "new_post_title", value = "")
-    scaffold_msg(paste("Created:", post_path))
-  })
-  
-  output$scaffold_status <- renderText({ scaffold_msg() })
-  
+
+  # ── Local-only: new post scaffolding ────────────────────────────────────────
+
+  if (is_local) {
+    scaffold_msg <- reactiveVal("")
+
+    observeEvent(input$scaffold_post, {
+      title <- str_trim(input$new_post_title)
+      if (title == "") { scaffold_msg("Please enter a post title."); return() }
+
+      script_path <- normalizePath(file.path(blog_root, "new_post.sh"))
+      system2("bash", args = c(script_path, shQuote(title)), stdout = TRUE, stderr = TRUE)
+
+      df          <- blog_data()
+      date_prefix <- format(Sys.Date(), "%Y-%m-%d")
+      year        <- format(Sys.Date(), "%Y")
+      slug        <- slugify(title)
+      post_path   <- paste0("posts/", year, "/", date_prefix, "-", slug)
+
+      new_row <- tibble(
+        post_id        = as.character(max(as.integer(df$post_id), na.rm = TRUE) + 1L),
+        title          = title,
+        lead_quote     = "", gist = "",
+        draft_started  = as.character(Sys.Date()),
+        published_date = NA_character_,
+        status         = "idea", publication = "unassigned",
+        path           = post_path,
+        chart_path     = "", image_path = "",
+        tags           = "", notes = ""
+      )
+
+      df <- bind_rows(df, new_row)
+      write_blog_registry(df)
+      blog_data(read_blog_registry())
+      updateTextInput(session, "new_post_title", value = "")
+      scaffold_msg(paste("Created:", post_path))
+    })
+
+    output$scaffold_status <- renderText({ scaffold_msg() })
+
+    observeEvent(input$scaffold_existing_click, {
+      post_id_clicked <- input$scaffold_existing_click$id
+      df  <- blog_data()
+      row <- df %>% filter(post_id == post_id_clicked) %>% slice(1)
+      if (nrow(row) == 0 || row$path != "") return()
+
+      scaffold_date <- if (!is.na(row$draft_started)) as.character(row$draft_started) else as.character(Sys.Date())
+      year          <- substr(scaffold_date, 1, 4)
+      slug          <- slugify(row$title)
+      post_rel_path <- paste0("posts/", year, "/", scaffold_date, "-", slug)
+      post_dir      <- file.path(blog_root, post_rel_path)
+
+      if (!dir.exists(post_dir)) {
+        dir.create(file.path(post_dir, "images"), recursive = TRUE)
+        template_path <- file.path(blog_root, "_template", "index.qmd")
+        dest_file     <- file.path(post_dir, "index.qmd")
+        file.copy(template_path, dest_file)
+        qmd <- readLines(dest_file)
+        qmd <- gsub('^title: "Post Title"', paste0('title: "', row$title, '"'), qmd)
+        qmd <- gsub('^date: today',         paste0('date: ', scaffold_date),    qmd)
+        writeLines(qmd, dest_file)
+      }
+
+      i <- match(post_id_clicked, df$post_id)
+      df$path[i] <- post_rel_path
+      if (is.na(df$draft_started[i])) df$draft_started[i] <- as.Date(scaffold_date)
+      write_blog_registry(df)
+      blog_data(read_blog_registry())
+    })
+  }
+
+  # ── Filtered data ───────────────────────────────────────────────────────────
+
   filtered_data <- reactive({
     df <- blog_data()
-    
-    if (!is.null(input$status_filter) && length(input$status_filter) > 0) {
+    if (is.null(df)) return(NULL)
+
+    if (!is.null(input$status_filter) && length(input$status_filter) > 0)
       df <- df %>% filter(status %in% input$status_filter)
-    }
-    
-    if (!is.null(input$publication_filter) && length(input$publication_filter) > 0) {
+
+    if (!is.null(input$publication_filter) && length(input$publication_filter) > 0)
       df <- df %>% filter(publication %in% input$publication_filter)
-    }
-    
+
     if (!is.null(input$search_text) && input$search_text != "") {
-      query <- str_to_lower(input$search_text)
-      df <- df %>%
-        filter(
-          str_detect(str_to_lower(title), fixed(query)) |
-            str_detect(str_to_lower(gist), fixed(query)) |
-            str_detect(str_to_lower(tags), fixed(query))
-        )
+      q  <- str_to_lower(input$search_text)
+      df <- df %>% filter(
+        str_detect(str_to_lower(title), fixed(q)) |
+        str_detect(str_to_lower(gist),  fixed(q)) |
+        str_detect(str_to_lower(tags),  fixed(q))
+      )
     }
-    
-    if (isTRUE(input$missing_only)) {
-      df <- df %>%
-        filter(
-          lead_quote == "" |
-            gist == "" |
-            status == "unassigned" |
-            publication == "unassigned"
-        )
-    }
-    
+
+    if (isTRUE(input$missing_only))
+      df <- df %>% filter(lead_quote == "" | gist == "" | status == "unassigned" | publication == "unassigned")
+
     df
   })
-  
+
+  # ── Summary counts ──────────────────────────────────────────────────────────
+
   output$total_posts <- renderText({
-    nrow(blog_data())
+    req(blog_data()); nrow(blog_data())
   })
-  
   output$published_posts <- renderText({
-    blog_data() %>%
-      filter(status == "published" | !is.na(published_date)) %>%
-      nrow()
+    req(blog_data())
+    blog_data() %>% filter(status == "published" | !is.na(published_date)) %>% nrow()
   })
-  
   output$unpublished_posts <- renderText({
-    blog_data() %>%
-      filter(status != "published" | is.na(published_date)) %>%
-      nrow()
+    req(blog_data())
+    blog_data() %>% filter(status != "published" | is.na(published_date)) %>% nrow()
   })
-  
   output$missing_posts <- renderText({
-    blog_data() %>%
-      filter(
-        lead_quote == "" |
-          gist == "" |
-          status == "unassigned" |
-          publication == "unassigned"
-      ) %>%
-      nrow()
+    req(blog_data())
+    blog_data() %>% filter(lead_quote == "" | gist == "" | status == "unassigned" | publication == "unassigned") %>% nrow()
   })
-  
+
+  # ── Posts table ─────────────────────────────────────────────────────────────
+
   output$posts_table <- renderDT({
+    req(filtered_data())
     df <- filtered_data() %>%
       select(post_id, title, status, publication, published_date, path, chart_path, image_path, tags) %>%
       mutate(post_id = as.integer(post_id))
-    
-    # Create document icon column: shows path on hover, grey if no path set
+
     df$doc <- if_else(
       df$path != "",
       paste0('<span title="', df$path, '" style="cursor: help; font-size: 1.2em;">&#128196;</span>'),
       '<span style="color: #ccc; font-size: 1.2em;">&#128196;</span>'
     )
-    
-    # Create setup column: ✅ if scaffolded, clickable ⚙️ if not
-    df$setup <- if_else(
-      df$path != "",
-      '<span style="font-size: 1.2em;">&#9989;</span>',
-      paste0(
-        '<a href="#" style="text-decoration: none; cursor: pointer; font-size: 1.2em;" ',
-        'onclick="Shiny.setInputValue(\'scaffold_existing_click\', {id: \'',
-        df$post_id, '\', time: Date.now()}); return false;" title="Scaffold post directory">&#9881;</a>'
+
+    # Setup column: clickable locally, greyed out on cloud
+    df$setup <- if (is_local) {
+      if_else(
+        df$path != "",
+        '<span style="font-size: 1.2em;">&#9989;</span>',
+        paste0('<a href="#" style="text-decoration: none; cursor: pointer; font-size: 1.2em;" ',
+               'onclick="Shiny.setInputValue(\'scaffold_existing_click\', {id: \'',
+               df$post_id, '\', time: Date.now()}); return false;" title="Scaffold post directory">&#9881;</a>')
       )
-    )
-    df <- df %>% select(-path)
-    
-    # Create green/red dot indicators for chart, image, and tags
-    make_dot <- function(filled) {
-      if_else(filled,
-        '<span style="color: green; font-size: 1.4em;">&#9679;</span>',
-        '<span style="color: red; font-size: 1.4em;">&#9679;</span>'
+    } else {
+      if_else(
+        df$path != "",
+        '<span style="font-size: 1.2em;">&#9989;</span>',
+        '<span style="color: #ccc; font-size: 1.2em; cursor: not-allowed;" title="Scaffolding disabled in cloud deployment">&#9881;</span>'
       )
     }
+    df <- df %>% select(-path)
+
+    make_dot <- function(filled) if_else(filled,
+      '<span style="color: green; font-size: 1.4em;">&#9679;</span>',
+      '<span style="color: red;   font-size: 1.4em;">&#9679;</span>'
+    )
     df$chart <- make_dot(df$chart_path != "")
     df$image <- make_dot(df$image_path != "")
-    df$tags <- make_dot(df$tags != "")
+    df$tags  <- make_dot(df$tags != "")
     df <- df %>% select(-chart_path, -image_path)
-    
-    # Create clickable links for each title
+
     df$title <- paste0(
-      '<a href="#" style="color: #0066cc; text-decoration: none; cursor: pointer;" onclick="Shiny.onInputChange(\'edit_post_click\', {id: \'', 
-      df$post_id, '\', time: Date.now()}); return false;">',
-      df$title,
-      '</a>'
+      '<a href="#" style="color: #0066cc; text-decoration: none; cursor: pointer;" ',
+      'onclick="Shiny.onInputChange(\'edit_post_click\', {id: \'', df$post_id, '\', time: Date.now()}); return false;">',
+      df$title, '</a>'
     )
-    
-    # Create dropdowns for status with color coding
+
     status_color <- case_when(
       df$status == "unassigned" ~ "red",
-      df$status == "published" ~ "green",
+      df$status == "published"  ~ "green",
       TRUE ~ "blue"
     )
     df$status <- paste0(
-      '<select class="status-select" data-post-id="', df$post_id, '" style="min-width: 110px; width: 100%; border: none; outline: none; background: transparent; color: ', status_color, '; font-weight: bold;">',
-      '<option value="idea"', if_else(df$status == "idea", " selected", ""), '>idea</option>',
-      '<option value="drafting"', if_else(df$status == "drafting", " selected", ""), '>drafting</option>',
-      '<option value="editing"', if_else(df$status == "editing", " selected", ""), '>editing</option>',
-      '<option value="scheduled"', if_else(df$status == "scheduled", " selected", ""), '>scheduled</option>',
-      '<option value="published"', if_else(df$status == "published", " selected", ""), '>published</option>',
+      '<select class="status-select" data-post-id="', df$post_id,
+      '" style="min-width: 110px; width: 100%; border: none; outline: none; background: transparent; color: ',
+      status_color, '; font-weight: bold;">',
+      '<option value="idea"',       if_else(df$status == "idea",       " selected", ""), '>idea</option>',
+      '<option value="drafting"',   if_else(df$status == "drafting",   " selected", ""), '>drafting</option>',
+      '<option value="editing"',    if_else(df$status == "editing",    " selected", ""), '>editing</option>',
+      '<option value="scheduled"',  if_else(df$status == "scheduled",  " selected", ""), '>scheduled</option>',
+      '<option value="published"',  if_else(df$status == "published",  " selected", ""), '>published</option>',
       '<option value="unassigned"', if_else(df$status == "unassigned", " selected", ""), '>unassigned</option>',
       '</select>'
     )
-    
-    # Create dropdowns for publication with color coding
+
     publication_color <- if_else(df$publication == "unassigned", "red", "black")
     df$publication <- paste0(
-      '<select class="publication-select" data-post-id="', df$post_id, '" style="width: 100%; border: none; outline: none; background: transparent; color: ', publication_color, ';">',
+      '<select class="publication-select" data-post-id="', df$post_id,
+      '" style="width: 100%; border: none; outline: none; background: transparent; color: ', publication_color, ';">',
       '<option value="unassigned"', if_else(df$publication == "unassigned", " selected", ""), '>unassigned</option>',
-      '<option value="substack"', if_else(df$publication == "substack", " selected", ""), '>substack</option>',
-      '<option value="website"', if_else(df$publication == "website", " selected", ""), '>website</option>',
-      '<option value="both"', if_else(df$publication == "both", " selected", ""), '>both</option>',
+      '<option value="substack"',   if_else(df$publication == "substack",   " selected", ""), '>substack</option>',
+      '<option value="website"',    if_else(df$publication == "website",    " selected", ""), '>website</option>',
+      '<option value="both"',       if_else(df$publication == "both",       " selected", ""), '>both</option>',
       '</select>'
     )
-    
-    # Create delete button column
+
     df$delete <- paste0(
       '<a href="#" style="color: red; text-decoration: none; cursor: pointer; font-size: 1.2em;" ',
-      'onclick="if(confirm(\'Are you sure you want to delete this post from the registry?\\n\\n',
-      'This cannot be undone.\')) { Shiny.setInputValue(\'delete_post_click\', {id: \'',
-      df$post_id, '\', time: Date.now()}); } return false;" title="Delete post">&#10060;</a>'
+      'onclick="if(confirm(\'Are you sure you want to delete this post?\\n\\nThis cannot be undone.\')) { ',
+      'Shiny.setInputValue(\'delete_post_click\', {id: \'', df$post_id, '\', time: Date.now()}); } return false;" ',
+      'title="Delete post">&#10060;</a>'
     )
-    
-    # Reorder columns
+
     df <- df %>% select(post_id, doc, setup, title, status, publication, published_date, chart, image, tags, delete)
-    
-    datatable(
-      df,
-      escape = FALSE,
-      selection = "none",
+
+    datatable(df, escape = FALSE, selection = "none",
       colnames = c("post_id", "", "Setup", "Title", "Status", "Publication", "Published", "Chart", "Image", "Tags", ""),
       options = list(
-        pageLength = 15,
-        scrollX = TRUE,
+        pageLength = 15, scrollX = TRUE,
         columnDefs = list(
           list(visible = FALSE, targets = 0),
           list(width = "30px", className = "dt-center", targets = c(1, 2, 7, 8, 9, 10))
@@ -416,194 +483,120 @@ server <- function(input, output, session) {
       )
     )
   })
-  
-  output$status_summary <- renderTable({
-    filtered_data() %>% count(status, sort = TRUE)
-  })
-  
-  output$publication_summary <- renderTable({
-    filtered_data() %>% count(publication, sort = TRUE)
-  })
-  
+
+  output$status_summary      <- renderTable({ req(filtered_data()); filtered_data() %>% count(status, sort = TRUE) })
+  output$publication_summary <- renderTable({ req(filtered_data()); filtered_data() %>% count(publication, sort = TRUE) })
+
+  # ── Edit post ───────────────────────────────────────────────────────────────
+
   observeEvent(input$edit_post_click, {
     post_id_clicked <- input$edit_post_click$id
-    df <- blog_data()
-    
+    df  <- blog_data()
     row <- df %>% filter(post_id == post_id_clicked) %>% slice(1)
-    
-    if (nrow(row) == 0) {
-      selected_post_id(NULL)
-      return()
-    }
-    
+    if (nrow(row) == 0) { selected_post_id(NULL); return() }
+
     selected_post_id(row$post_id)
-    
-    updateTextInput(session, "edit_title", value = row$title)
-    updateTextAreaInput(session, "edit_lead_quote", value = row$lead_quote)
-    updateTextAreaInput(session, "edit_gist", value = row$gist)
-    
-    updateDateInput(session, "edit_draft_started", value = row$draft_started)
-    updateDateInput(session, "edit_published_date", value = row$published_date)
-    
-    updateSelectInput(session, "edit_status", selected = row$status)
-    updateSelectInput(session, "edit_publication", selected = row$publication)
-    
-    updateTextInput(session, "edit_path", value = row$path)
-    updateTextInput(session, "edit_chart_path", value = row$chart_path)
-    updateTextInput(session, "edit_image_path", value = row$image_path)
-    updateTextInput(session, "edit_tags", value = row$tags)
-    updateTextAreaInput(session, "edit_notes", value = row$notes)
-    
-    # Switch to the Edit tab
+    updateTextInput(session,     "edit_title",        value = row$title)
+    updateTextAreaInput(session, "edit_lead_quote",   value = row$lead_quote)
+    updateTextAreaInput(session, "edit_gist",         value = row$gist)
+    updateDateInput(session,     "edit_draft_started",  value = row$draft_started)
+    updateDateInput(session,     "edit_published_date", value = row$published_date)
+    updateSelectInput(session,   "edit_status",       selected = row$status)
+    updateSelectInput(session,   "edit_publication",  selected = row$publication)
+    updateTextInput(session,     "edit_path",         value = row$path)
+    updateTextInput(session,     "edit_chart_path",   value = row$chart_path)
+    updateTextInput(session,     "edit_image_path",   value = row$image_path)
+    updateTextInput(session,     "edit_tags",         value = row$tags)
+    updateTextAreaInput(session, "edit_notes",        value = row$notes)
     updateTabsetPanel(session, "main_tabs", selected = "Edit selected post")
   })
-  
-  observeEvent(input$scaffold_existing_click, {
-    post_id_clicked <- input$scaffold_existing_click$id
+
+  observeEvent(input$save_changes, {
+    req(selected_post_id())
     df <- blog_data()
-    row <- df %>% filter(post_id == post_id_clicked) %>% slice(1)
-    
-    if (nrow(row) == 0 || row$path != "") return()
-    
-    # Determine date: use draft_started if available, else today
-    scaffold_date <- if (!is.na(row$draft_started)) {
-      as.character(row$draft_started)
-    } else {
-      as.character(Sys.Date())
-    }
-    year <- substr(scaffold_date, 1, 4)
-    slug <- slugify(row$title)
-    
-    post_rel_path <- paste0("posts/", year, "/", scaffold_date, "-", slug)
-    post_dir <- file.path(blog_root, post_rel_path)
-    
-    if (!dir.exists(post_dir)) {
-      dir.create(file.path(post_dir, "images"), recursive = TRUE)
-      
-      # Copy template and fill in frontmatter
-      template_path <- file.path(blog_root, "_template", "index.qmd")
-      dest_file <- file.path(post_dir, "index.qmd")
-      file.copy(template_path, dest_file)
-      
-      qmd_content <- readLines(dest_file)
-      qmd_content <- gsub('^title: "Post Title"',
-                          paste0('title: "', row$title, '"'),
-                          qmd_content)
-      qmd_content <- gsub('^date: today',
-                          paste0('date: ', scaffold_date),
-                          qmd_content)
-      writeLines(qmd_content, dest_file)
-    }
-    
-    # Update path in registry
-    i <- match(post_id_clicked, df$post_id)
-    df$path[i] <- post_rel_path
-    if (is.na(df$draft_started[i])) {
-      df$draft_started[i] <- as.Date(scaffold_date)
-    }
-    write_blog_registry(df, registry_path)
+    i  <- match(selected_post_id(), df$post_id)
+    req(!is.na(i))
+
+    norm_date <- function(x) if (is.null(x) || is.na(x) || x == "") NA else as.character(as.Date(x))
+
+    df$title[i]         <- input$edit_title
+    df$lead_quote[i]    <- input$edit_lead_quote
+    df$gist[i]          <- input$edit_gist
+    df$draft_started[i] <- norm_date(input$edit_draft_started)
+    df$published_date[i]<- norm_date(input$edit_published_date)
+    df$status[i]        <- input$edit_status
+    df$publication[i]   <- input$edit_publication
+    df$path[i]          <- input$edit_path
+    df$chart_path[i]    <- input$edit_chart_path
+    df$image_path[i]    <- input$edit_image_path
+    df$tags[i]          <- input$edit_tags
+    df$notes[i]         <- input$edit_notes
+
+    write_blog_registry(df)
     blog_data(read_blog_registry())
   })
-  
+
+  observeEvent(input$clear_form, {
+    selected_post_id(NULL)
+    updateTextInput(session,     "edit_title",          value = "")
+    updateTextAreaInput(session, "edit_lead_quote",     value = "")
+    updateTextAreaInput(session, "edit_gist",           value = "")
+    updateDateInput(session,     "edit_draft_started",  value = NA)
+    updateDateInput(session,     "edit_published_date", value = NA)
+    updateSelectInput(session,   "edit_status",         selected = "unassigned")
+    updateSelectInput(session,   "edit_publication",    selected = "unassigned")
+    updateTextInput(session,     "edit_path",           value = "")
+    updateTextInput(session,     "edit_chart_path",     value = "")
+    updateTextInput(session,     "edit_image_path",     value = "")
+    updateTextInput(session,     "edit_tags",           value = "")
+    updateTextAreaInput(session, "edit_notes",          value = "")
+  })
+
+  # ── Delete post ─────────────────────────────────────────────────────────────
+
   observeEvent(input$delete_post_click, {
     post_id_clicked <- input$delete_post_click$id
-    df <- blog_data()
-    
-    # Get the post's path before deleting from registry
+    df  <- blog_data()
     row <- df %>% filter(post_id == post_id_clicked) %>% slice(1)
-    
-    if (nrow(row) == 1 && row$path != "") {
-      blog_root <- normalizePath(file.path(dirname(registry_path), ".."))
+
+    if (is_local && nrow(row) == 1 && row$path != "") {
       post_dir <- file.path(blog_root, row$path)
-      
       if (dir.exists(post_dir)) {
-        # Mirror the post's relative path structure under archive/
         archive_dir <- file.path(blog_root, "archive", row$path)
         dir.create(dirname(archive_dir), recursive = TRUE, showWarnings = FALSE)
         file.rename(post_dir, archive_dir)
       }
     }
-    
+
     df <- df %>% filter(post_id != post_id_clicked)
-    write_blog_registry(df, registry_path)
+    write_blog_registry(df)
     blog_data(read_blog_registry())
   })
-  
-  observeEvent(input$clear_form, {
-    selected_post_id(NULL)
-    
-    updateTextInput(session, "edit_title", value = "")
-    updateTextAreaInput(session, "edit_lead_quote", value = "")
-    updateTextAreaInput(session, "edit_gist", value = "")
-    updateDateInput(session, "edit_draft_started", value = NA)
-    updateDateInput(session, "edit_published_date", value = NA)
-    updateSelectInput(session, "edit_status", selected = "unassigned")
-    updateSelectInput(session, "edit_publication", selected = "unassigned")
-    updateTextInput(session, "edit_path", value = "")
-    updateTextInput(session, "edit_chart_path", value = "")
-    updateTextInput(session, "edit_image_path", value = "")
-    updateTextInput(session, "edit_tags", value = "")
-    updateTextAreaInput(session, "edit_notes", value = "")
-  })
-  
+
+  # ── Inline dropdown updates ─────────────────────────────────────────────────
+
   observeEvent(input$update_cell_click, {
     post_id_clicked <- input$update_cell_click$id
-    field <- input$update_cell_click$field
+    field     <- input$update_cell_click$field
     new_value <- input$update_cell_click$value
-    
     df <- blog_data()
-    i <- match(post_id_clicked, df$post_id)
-    
+    i  <- match(post_id_clicked, df$post_id)
     if (!is.na(i)) {
       df[[field]][i] <- new_value
-      write_blog_registry(df, registry_path)
+      write_blog_registry(df)
       blog_data(read_blog_registry())
     }
   })
-  
-  observeEvent(input$save_changes, {
-    req(selected_post_id())
-    
-    df <- blog_data()
-    i <- match(selected_post_id(), df$post_id)
-    
-    req(!is.na(i))
-    
-    normalize_date <- function(x) {
-      if (is.null(x) || is.na(x) || x == "") NA else as.character(as.Date(x))
-    }
-    
-    df$title[i] <- input$edit_title
-    df$lead_quote[i] <- input$edit_lead_quote
-    df$gist[i] <- input$edit_gist
-    df$draft_started[i] <- normalize_date(input$edit_draft_started)
-    df$published_date[i] <- normalize_date(input$edit_published_date)
-    df$status[i] <- input$edit_status
-    df$publication[i] <- input$edit_publication
-    df$path[i] <- input$edit_path
-    df$chart_path[i] <- input$edit_chart_path
-    df$image_path[i] <- input$edit_image_path
-    df$tags[i] <- input$edit_tags
-    df$notes[i] <- input$edit_notes
-    
-    write_blog_registry(df, registry_path)
-    blog_data(read_blog_registry())
-  })
-  
+
+  # ── Status text ─────────────────────────────────────────────────────────────
+
   output$selected_post_id <- renderText({
-    if (is.null(selected_post_id())) {
-      "No post loaded."
-    } else {
-      paste("Loaded post:", selected_post_id())
-    }
+    if (is.null(selected_post_id())) "No post loaded." else paste("Loaded post:", selected_post_id())
   })
-  
+
   output$save_status <- renderText({
-    if (is.null(selected_post_id())) {
-      "Select a row in the Posts tab, then click 'Load selected post'."
-    } else {
-      paste("Ready to edit:", selected_post_id())
-    }
+    if (is.null(selected_post_id())) "Select a row in the Posts tab, then click 'Load selected post'."
+    else paste("Ready to edit:", selected_post_id())
   })
 }
 

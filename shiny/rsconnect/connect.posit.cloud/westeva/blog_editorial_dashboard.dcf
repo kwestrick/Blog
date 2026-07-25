@@ -1,0 +1,10 @@
+name: blog_editorial_dashboard
+title: Blog Editorial Dashboard
+username: westeva
+account: westeva
+server: connect.posit.cloud
+hostUrl: https://api.connect.posit.cloud/v1
+appId: 019f99ba-ec67-dff8-4e6d-9888f25a6fa5
+bundleId:
+url: https://connect.posit.cloud/westeva/content/019f99ba-ec67-dff8-4e6d-9888f25a6fa5
+version: 1

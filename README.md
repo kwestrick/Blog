@@ -51,6 +51,31 @@ Run the dashboard from the repository root:
 shiny::runApp("shiny")
 ```
 
+### Authentication
+
+The dashboard is protected with a login screen. Credentials are stored as a plain list in `shiny/app.R` (lines 11-17).
+
+**Current users:**
+- `admin` / `grunt11B!`
+- `ken` / `ken321Neth!`
+- `anton` / `an321Ton!`
+
+**To add or change a user:**
+
+1. Edit the `credentials` list in `shiny/app.R`:
+   ```r
+   credentials <- list(
+     admin  = "grunt11B!",
+     newuser = "their_password"
+   )
+   ```
+
+2. Run `deploy_dashboard()` to sync and redeploy:
+   ```r
+   source("deploy.R")
+   deploy_dashboard()
+   ```
+
 ### Posts tab
 
 - Filterable data table with inline status and publication dropdowns (color-coded)
@@ -86,6 +111,23 @@ posts/YYYY/YYYY-MM-DD-slug/
 ├── index.qmd    # Pre-filled with title and date from _template/index.qmd
 └── images/      # Empty subfolder for post assets
 ```
+
+## Deploying to Connect Cloud
+
+Use `deploy.R` to sync the local registry and redeploy the dashboard in one step:
+
+```r
+source("deploy.R")
+deploy_dashboard()
+```
+
+This copies `docs/blog_registry.csv` → `shiny/blog_registry.csv` before deploying, so the cloud app always starts with the latest local registry.
+
+**Syncing edits made in the cloud app back to local:**
+
+1. Click **"Download registry CSV"** in the app sidebar
+2. Save the file over `docs/blog_registry.csv`
+3. Run `deploy_dashboard()` when ready to redeploy
 
 ## Quarto site
 

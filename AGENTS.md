@@ -6,8 +6,10 @@ Quarto website blog with a Shiny dashboard for editorial workflow management. Ap
 
 ## Key files
 
-- `docs/blog_registry.csv` — single source of truth for post metadata (13 fields, see README for schema)
-- `shiny/app.R` — Shiny dashboard for browsing, filtering, and editing post metadata
+- `docs/blog_registry.csv` — local source of truth for post metadata (13 fields, see README for schema)
+- `shiny/blog_registry.csv` — copy of the registry bundled with the deployed app; must be kept in sync with `docs/blog_registry.csv` before each deployment
+- `shiny/app.R` — Shiny dashboard for browsing, filtering, and editing post metadata; single file with `is_local` detection that adapts behavior for local vs. cloud
+- `deploy.R` — helper script; `deploy_dashboard()` syncs the CSV and redeploys to Connect Cloud
 - `new_post.sh` — bash script to scaffold new post directories
 - `_template/index.qmd` — template used by `new_post.sh`
 - `index.qmd` — site homepage; listing uses `contents: "posts/**/*.qmd"`
@@ -30,9 +32,34 @@ Posts live at `posts/YYYY/YYYY-MM-DD-slug/index.qmd` with an `images/` subfolder
 - Inline dropdowns for status/publication save immediately to CSV on change
 - Edit form uses explicit "Save changes" button
 - Post titles in the table are clickable links that switch to the Edit tab
-- Setup column (⚙️) scaffolds directories using `draft_started` date or today's date
-- Delete (✖) moves the entire post directory to `archive/` and removes the CSV row
+- Setup column (⚙️) scaffolds directories using `draft_started` date or today's date (local only; disabled in cloud deployment)
+- Delete (✖) removes the CSV row; also archives the post directory locally (file move disabled in cloud deployment)
 - JavaScript event delegation handles inline dropdown changes
+- "Download registry CSV" button in sidebar exports the current CSV for local sync
+- "Sign out" button returns to the login screen
+
+## Cloud deployment
+
+- Deployed to Posit Connect Cloud: https://connect.posit.cloud/westeva/content/019f99ba-ec67-dff8-4e6d-9888f25a6fa5
+- Account: `westeva` on `connect.posit.cloud`
+- Deploy command (use this instead of calling `rsconnect::deployApp` directly):
+  ```r
+  source("deploy.R")
+  deploy_dashboard()
+  ```
+- Authentication: custom login screen in `shiny/app.R` (no external packages); credentials stored as a named list near the top of the file
+- The Free plan on Connect Cloud does not support server-level access control; authentication is handled app-side
+
+## CSV sync workflow
+
+The deployed app writes edits to its own copy of `blog_registry.csv` on Connect Cloud's server. To keep in sync:
+
+1. After making edits in the cloud app, use the **"Download registry CSV"** button in the sidebar
+2. Save the downloaded file to `docs/blog_registry.csv` locally
+3. Before the next deployment, copy it to the shiny bundle:
+   ```r
+   file.copy("docs/blog_registry.csv", "shiny/blog_registry.csv", overwrite = TRUE)
+   ```
 
 ## Data loading
 
