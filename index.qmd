@@ -1,9 +1,7 @@
 ---
 title: "Blog"
 listing:
-  # Matches post subdirectories named YYYY-MM-DD-slug/ at the top level
-  # (the leading underscore on _template/ excludes it automatically)
-  contents: "[0-9][0-9][0-9][0-9]-*/*.qmd"
+  contents: "posts/**/*.qmd"
   feed: true
   sort: "date desc"
   type: default

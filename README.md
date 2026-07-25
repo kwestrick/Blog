@@ -1,70 +1,92 @@
-# Blog workflow and dashboard
+# Blog Workflow and Dashboard
 
-This repository is a Quarto website for blog posts, with an additional metadata registry and a Shiny dashboard for managing the editorial pipeline.
+This repository is a Quarto website for blog posts, with a metadata registry and a Shiny dashboard for managing the editorial pipeline.
 
 ## Repository layout
 
-The site is configured as a Quarto website with `_site` as the output directory, plus standard pages such as `index.qmd` and `about.qmd`.
+```
+Blog/
+├── posts/YYYY/YYYY-MM-DD-slug/   # Blog post directories
+│   ├── index.qmd                 # Post content
+│   └── images/                   # Post-specific images
+├── _template/index.qmd           # Template for new posts
+├── docs/
+│   └── blog_registry.csv         # Post metadata registry
+├── shiny/app.R                   # Workflow dashboard
+├── archive/                      # Deleted post directories (preserved structure)
+├── new_post.sh                   # Post scaffolding script
+├── index.qmd                     # Site homepage with post listing
+├── about.qmd                     # About page
+├── _quarto.yml                   # Quarto site configuration
+└── styles.css                    # Site styles
+```
 
-Recommended structure for workflow management:
+## Blog registry
 
-- `docs/blog_registry.md` — human-readable catalog of post ideas, drafts, and published pieces.
-- `docs/blog_registry.csv` — structured registry for RStudio and the Shiny dashboard.
-- `shiny/app.R` — reactive dashboard for browsing and editing post metadata.
-- dated post folders such as `2026-07-23-example-post/` — Quarto post content and related assets.
+The CSV at `docs/blog_registry.csv` is the single source of truth for editorial metadata.
 
-## Blog registry fields
+### Fields
 
-The CSV registry is the main structured source of truth for editorial metadata.
-
-Expected columns:
-
-- `post_id`
-- `title`
-- `lead_quote`
-- `gist`
-- `idea_date`
-- `draft_started`
-- `published_date`
-- `publication`
-- `status`
-- `path`
-- `assets`
-- `substack_url`
-- `website_url`
-- `notes`
-- `r_project`
-- `tags`
-
-Suggested status values:
-
-- `idea`
-- `drafting`
-- `editing`
-- `scheduled`
-- `published`
-- `unassigned`
-
-Suggested publication values:
-
-- `substack`
-- `website`
-- `both`
-- `unassigned`
+| Field | Description |
+|-------|-------------|
+| `post_id` | Auto-generated integer key (internal, not displayed in UI) |
+| `title` | Post title |
+| `lead_quote` | Opening quote for the post |
+| `gist` | Brief summary of the post idea |
+| `draft_started` | Date drafting began |
+| `published_date` | Publication date |
+| `status` | Editorial status: `idea`, `drafting`, `editing`, `scheduled`, `published`, `unassigned` |
+| `publication` | Target outlet: `substack`, `website`, `both`, `unassigned` |
+| `path` | Relative path to the post directory |
+| `chart_path` | Path to chart/graph/map/table assets |
+| `image_path` | Path to image/photo assets |
+| `tags` | Comma-separated topic tags |
+| `notes` | Free-text notes |
 
 ## Shiny dashboard
 
-The Shiny app reads `docs/blog_registry.csv`, lets the user filter and inspect posts, and supports write-back editing of metadata fields directly into the CSV file.
-
-Primary features:
-
-- Filter by status and publication.
-- Search by title, gist, or tags.
-- Show posts missing key metadata.
-- Load a selected post into an edit form.
-- Save edits back to `docs/blog_registry.csv`.
-
-To run the dashboard from the repository root in RStudio:
+Run the dashboard from the repository root:
 
 ```r
 shiny::runApp("shiny")
+```
+
+### Posts tab
+
+- Filterable data table with inline status and publication dropdowns (color-coded)
+- 📄 icon shows file path on hover; ⚙️ icon scaffolds the post directory on click (becomes ✅ when directory exists)
+- Post titles are clickable links that load the Edit tab
+- Green/red dot indicators for chart, image, and tag completeness
+- ✖ delete icon archives the post directory and removes the registry entry
+
+### Edit Selected Post tab
+
+- Full metadata editing form with Load / Save / Clear / Back to Posts controls
+- Summary panels: total posts, published, unpublished, missing fields
+
+### Sidebar
+
+- Refresh data, create new post (runs `new_post.sh`)
+- Filter by status, publication, text search
+- Toggle to show only posts missing key metadata
+
+## Creating posts
+
+Two workflows:
+
+1. **Sidebar "Create new post"** — enter a title, click create. Runs `new_post.sh` to scaffold the directory and auto-registers the post with status `idea`.
+2. **Setup icon (⚙️) in Posts tab** — for registry entries that don't yet have a directory. Uses `draft_started` date (or today) for the directory name.
+
+## Post directory structure
+
+`new_post.sh` creates:
+
+```
+posts/YYYY/YYYY-MM-DD-slug/
+├── index.qmd    # Pre-filled with title and date from _template/index.qmd
+└── images/      # Empty subfolder for post assets
+```
+
+## Quarto site
+
+The site listing in `index.qmd` uses `contents: "posts/**/*.qmd"` to recursively discover all posts across year directories. Output renders to `_site/`.

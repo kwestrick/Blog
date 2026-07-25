@@ -1,0 +1,34 @@
+---
+title: "Back to Basics: The 14 Leadership Principles I Learned as a Young Soldier"
+description: "One or two sentence summary of the post, shown in the listing page."
+author: "Your Name"
+date: 2026-07-24
+categories: [category1, category2]
+image: featured-image.png
+draft: true
+---
+
+## Introduction
+
+Start writing here.
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+```
+
+## Section Heading
+
+```{r}
+#| label: example-chart
+#| fig-cap: "Chart caption goes here."
+
+# Reference figures, charts, and data files directly from this
+# post's own directory, e.g. read_csv("raw_data.csv")
+```
+
+## Conclusion
+
+Wrap up here.

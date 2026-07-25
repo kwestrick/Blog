@@ -1,8 +1,24 @@
+# Quarto
 .quarto/
-_site/
-
 /.quarto/
 **/*.quarto_ipynb
-.DS_Store
+_site/
+_freeze/
+
+# R
 *.Rproj.user/
+.RData
+.Rhistory
 *.rds
+
+# Deployment
+manifest.json
+
+# Generated
+index_files/
+
+# System
+.DS_Store
+
+# Posit Assistant
+.posit/assistant
