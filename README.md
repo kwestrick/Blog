@@ -11,8 +11,11 @@ Blog/
 │   └── images/                   # Post-specific images
 ├── _template/index.qmd           # Template for new posts
 ├── docs/
-│   └── blog_registry.csv         # Post metadata registry
-├── shiny/app.R                   # Workflow dashboard
+│   └── blog_registry.csv         # Post metadata registry (local source of truth)
+├── shiny/
+│   ├── app.R                     # Workflow dashboard (local + cloud, auto-detected)
+│   └── blog_registry.csv         # Registry bundled with cloud deployment
+├── deploy.R                      # deploy_dashboard() helper — sync CSV + redeploy
 ├── archive/                      # Deleted post directories (preserved structure)
 ├── new_post.sh                   # Post scaffolding script
 ├── index.qmd                     # Site homepage with post listing
@@ -51,9 +54,11 @@ Run the dashboard from the repository root:
 shiny::runApp("shiny")
 ```
 
-### Authentication
+The app detects its environment automatically: running locally via `shiny::runApp("shiny")` gives full access with no login; the deployed cloud version requires authentication and disables file system operations.
 
-The dashboard is protected with a login screen. Credentials are stored as a plain list in `shiny/app.R` (lines 11-17).
+### Authentication (cloud only)
+
+The cloud deployment is protected with a login screen. Credentials are stored as a plain list in `shiny/app.R` (lines 11-17).
 
 **Current users:**
 - `admin` / `grunt11B!`
@@ -79,10 +84,11 @@ The dashboard is protected with a login screen. Credentials are stored as a plai
 ### Posts tab
 
 - Filterable data table with inline status and publication dropdowns (color-coded)
-- 📄 icon shows file path on hover; ⚙️ icon scaffolds the post directory on click (becomes ✅ when directory exists)
+- 📄 icon shows file path on hover
+- ⚙️ icon scaffolds the post directory on click (becomes ✅ when done) — **local only**
 - Post titles are clickable links that load the Edit tab
 - Green/red dot indicators for chart, image, and tag completeness
-- ✖ delete icon archives the post directory and removes the registry entry
+- ✖ delete icon removes the registry entry; also archives the post directory to `archive/` — **local only**
 
 ### Edit Selected Post tab
 
@@ -91,13 +97,17 @@ The dashboard is protected with a login screen. Credentials are stored as a plai
 
 ### Sidebar
 
-- Refresh data, create new post (runs `new_post.sh`)
-- Filter by status, publication, text search
-- Toggle to show only posts missing key metadata
+| Control | Local | Cloud |
+|---------|-------|-------|
+| Refresh data | ✅ | ✅ |
+| Create new post | ✅ | — |
+| Download registry CSV | — | ✅ |
+| Sign out | — | ✅ |
+| Filters (status, publication, search) | ✅ | ✅ |
 
 ## Creating posts
 
-Two workflows:
+Two workflows (local only):
 
 1. **Sidebar "Create new post"** — enter a title, click create. Runs `new_post.sh` to scaffold the directory and auto-registers the post with status `idea`.
 2. **Setup icon (⚙️) in Posts tab** — for registry entries that don't yet have a directory. Uses `draft_started` date (or today) for the directory name.
