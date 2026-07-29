@@ -1,0 +1,37 @@
+---
+title: "An Antiquated 'Maginot Line' Approach to Foreign Policy"
+description: "The US border policy is built around principles that were superseded over a century ago"
+author: "Kenneth Westrick"
+date: 2026-07-25
+categories: [Immigration]
+image: featured-image.png
+draft: true
+post_id: 4
+---
+
+## Introduction
+
+One of the enduring lessons of the Great War, more commonly known as World War I, was the belief that strong static defenses could be used to keep at bay foreign adversaries that wished to invade. 
+These lessons - learned at great costs at battles from Ypres to the Somme - influenced French post war strategy to build the Maginot line, a series of static fortifications to thwart any potential forays from an increasingly militant Germany into France. At huge economic and political cost this line of fortifications was built, providing France with a sense of security that was in name only. When war came in May 1940 the Germans simply circumvented this barrier, mainly going around it or taking key positions, such as Eben Amal, which was taken by German paratroopers. So much for static defense.
+
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+```
+
+Reading about Trump's plan for protecting the US from illegal immigration I couldn't help but think of the Maginot line in particular, and static defense in general. There are many parallels. 
+
+```{r}
+#| label: example-chart
+#| fig-cap: "Chart caption goes here."
+
+# Reference figures, charts, and data files directly from this
+# post's own directory, e.g. read_csv("raw_data.csv")
+```
+
+## Conclusion
+
+Wrap up here.

@@ -290,12 +290,20 @@ server <- function(input, output, session) {
       slug        <- slugify(title)
       post_path   <- paste0("posts/", year, "/", date_prefix, "-", slug)
 
+      new_post_id <- as.character(max(as.integer(df$post_id), na.rm = TRUE) + 1L)
+      qmd_file    <- file.path(blog_root, post_path, "index.qmd")
+      if (file.exists(qmd_file)) {
+        qmd <- readLines(qmd_file)
+        qmd <- gsub("^post_id: 0", paste0("post_id: ", new_post_id), qmd)
+        writeLines(qmd, qmd_file)
+      }
+
       new_row <- tibble(
-        post_id        = as.character(max(as.integer(df$post_id), na.rm = TRUE) + 1L),
+        post_id        = new_post_id,
         title          = title,
         lead_quote     = "", gist = "",
-        draft_started  = as.character(Sys.Date()),
-        published_date = NA_character_,
+        draft_started  = Sys.Date(),
+        published_date = as.Date(NA),
         status         = "idea", publication = "unassigned",
         path           = post_path,
         chart_path     = "", image_path = "",
@@ -331,6 +339,7 @@ server <- function(input, output, session) {
         qmd <- readLines(dest_file)
         qmd <- gsub('^title: "Post Title"', paste0('title: "', row$title, '"'), qmd)
         qmd <- gsub('^date: today',         paste0('date: ', scaffold_date),    qmd)
+        qmd <- gsub('^post_id: 0',          paste0('post_id: ', row$post_id),   qmd)
         writeLines(qmd, dest_file)
       }
 

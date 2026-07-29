@@ -10,6 +10,10 @@
 library(rsconnect)
 
 deploy_dashboard <- function() {
+  # Sync QMD front matter → registry before deploying
+  source("sync_registry.R")
+  message("✔ Registry synced from post index.qmd files")
+
   # Sync local registry into the shiny bundle before deploying
   file.copy("docs/blog_registry.csv", "shiny/blog_registry.csv", overwrite = TRUE)
   message("✔ Synced docs/blog_registry.csv → shiny/blog_registry.csv")

@@ -1,11 +1,10 @@
 ---
-title: "Post Title"
+title: "Trumps Maginot Line Approach to Foreign Policy"
 description: "One or two sentence summary of the post, shown in the listing page."
-author: "Kenneth Westrick"
-date: today
-post_id: 0
-categories: [Leadership & Ethics, Geopolitics, Immigration, Economics, Saving Democracy, Science & Technology, Global Environment, Future]
-image: images/featured-image.png
+author: "Your Name"
+date: 2026-07-25
+categories: [category1, category2]
+image: featured-image.png
 draft: true
 ---
 
