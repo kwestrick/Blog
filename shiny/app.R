@@ -1,4 +1,5 @@
 library(shiny)
+library(shinyjs)
 library(readr)
 library(dplyr)
 library(stringr)
@@ -86,6 +87,7 @@ login_ui <- fluidPage(
 )
 
 main_ui <- fluidPage(
+  shinyjs::useShinyjs(),
   tags$head(
     tags$script(HTML("
       $(document).on('change', '.status-select, .publication-select', function() {
@@ -163,7 +165,8 @@ main_ui <- fluidPage(
         ),
 
         tabPanel(
-          "Edit selected post",
+          uiOutput("edit_tab_title"),
+          value = "edit_tab",
           br(),
           actionButton("back_to_posts", "← Back to Posts"),
           br(), br(),
@@ -248,6 +251,8 @@ server <- function(input, output, session) {
 
   blog_data         <- reactiveVal(NULL)
   selected_post_id  <- reactiveVal(NULL)
+  original_form_data <- reactiveVal(NULL)
+  has_unsaved_changes <- reactiveVal(FALSE)
 
   observeEvent(authenticated(), {
     req(authenticated())
@@ -269,7 +274,46 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$back_to_posts, {
+    if (has_unsaved_changes()) {
+      shinyjs::runjs("
+        if (confirm('You have unsaved changes. Do you want to discard them and go back to the Posts tab?')) {
+          Shiny.setInputValue('confirm_back_to_posts', true);
+        }
+      ")
+    } else {
+      updateTabsetPanel(session, "main_tabs", selected = "Posts")
+    }
+  })
+
+  observeEvent(input$confirm_back_to_posts, {
+    has_unsaved_changes(FALSE)
+    selected_post_id(NULL)
+    original_form_data(NULL)
     updateTabsetPanel(session, "main_tabs", selected = "Posts")
+  })
+
+  # ── Change detection ─────────────────────────────────────────────────────────
+  
+  observe({
+    req(original_form_data(), selected_post_id())
+    
+    orig <- original_form_data()
+    changed <- (
+      input$edit_title != orig$title ||
+      input$edit_lead_quote != orig$lead_quote ||
+      input$edit_gist != orig$gist ||
+      !identical(input$edit_draft_started, orig$draft_started) ||
+      !identical(input$edit_published_date, orig$published_date) ||
+      input$edit_status != orig$status ||
+      input$edit_publication != orig$publication ||
+      input$edit_path != orig$path ||
+      input$edit_chart_path != orig$chart_path ||
+      input$edit_image_path != orig$image_path ||
+      input$edit_tags != orig$tags ||
+      input$edit_notes != orig$notes
+    )
+    
+    has_unsaved_changes(changed)
   })
 
   # ── Local-only: new post scaffolding ────────────────────────────────────────
@@ -375,6 +419,13 @@ server <- function(input, output, session) {
     if (isTRUE(input$missing_only))
       df <- df %>% filter(lead_quote == "" | gist == "" | status == "unassigned" | publication == "unassigned")
 
+    # Sort by status priority: editing, drafting, scheduled, idea, published, unassigned
+    status_order <- c("editing", "drafting", "scheduled", "idea", "published", "unassigned")
+    df <- df %>%
+      mutate(status_priority = match(status, status_order)) %>%
+      arrange(status_priority) %>%
+      select(-status_priority)
+
     df
   })
 
@@ -443,6 +494,10 @@ server <- function(input, output, session) {
       df$title, '</a>'
     )
 
+    # Capture priority BEFORE status is overwritten with HTML
+    status_order <- c("editing", "drafting", "scheduled", "idea", "published", "unassigned")
+    df$status_priority <- match(df$status, status_order)
+
     status_color <- case_when(
       df$status == "unassigned" ~ "red",
       df$status == "published"  ~ "green",
@@ -479,15 +534,18 @@ server <- function(input, output, session) {
       'title="Delete post">&#10060;</a>'
     )
 
-    df <- df %>% select(post_id, doc, setup, title, status, publication, published_date, chart, image, tags, delete)
+    # status_priority (col 1) is hidden; clicking Status (col 6) sorts by it
+    df <- df %>% select(post_id, status_priority, doc, setup, title, status, publication, published_date, chart, image, tags, delete)
 
-    datatable(df, escape = FALSE, selection = "none",
-      colnames = c("post_id", "", "Setup", "Title", "Status", "Publication", "Published", "Chart", "Image", "Tags", ""),
+    datatable(df, escape = FALSE, selection = "none", rownames = FALSE,
+      colnames = c("post_id", "sp", "", "Setup", "Title", "Status", "Publication", "Published", "Chart", "Image", "Tags", ""),
       options = list(
         pageLength = 15, scrollX = TRUE,
+        order = list(list(1, "asc")),
         columnDefs = list(
-          list(visible = FALSE, targets = 0),
-          list(width = "30px", className = "dt-center", targets = c(1, 2, 7, 8, 9, 10))
+          list(visible = FALSE, targets = c(0, 1)),
+          list(width = "30px", className = "dt-center", targets = c(2, 3, 8, 9, 10, 11)),
+          list(orderData = 1, targets = 5)
         )
       )
     )
@@ -495,6 +553,16 @@ server <- function(input, output, session) {
 
   output$status_summary      <- renderTable({ req(filtered_data()); filtered_data() %>% count(status, sort = TRUE) })
   output$publication_summary <- renderTable({ req(filtered_data()); filtered_data() %>% count(publication, sort = TRUE) })
+
+  # ── Edit tab title with unsaved changes indicator ────────────────────────────
+  
+  output$edit_tab_title <- renderUI({
+    title <- "Edit selected post"
+    if (has_unsaved_changes()) {
+      title <- paste0(title, " *")
+    }
+    title
+  })
 
   # ── Edit post ───────────────────────────────────────────────────────────────
 
@@ -504,7 +572,24 @@ server <- function(input, output, session) {
     row <- df %>% filter(post_id == post_id_clicked) %>% slice(1)
     if (nrow(row) == 0) { selected_post_id(NULL); return() }
 
+    # Store the original form data for change detection
+    original_form_data(list(
+      title = row$title,
+      lead_quote = row$lead_quote,
+      gist = row$gist,
+      draft_started = row$draft_started,
+      published_date = row$published_date,
+      status = row$status,
+      publication = row$publication,
+      path = row$path,
+      chart_path = row$chart_path,
+      image_path = row$image_path,
+      tags = row$tags,
+      notes = row$notes
+    ))
+    
     selected_post_id(row$post_id)
+    has_unsaved_changes(FALSE)
     updateTextInput(session,     "edit_title",        value = row$title)
     updateTextAreaInput(session, "edit_lead_quote",   value = row$lead_quote)
     updateTextAreaInput(session, "edit_gist",         value = row$gist)
@@ -517,7 +602,7 @@ server <- function(input, output, session) {
     updateTextInput(session,     "edit_image_path",   value = row$image_path)
     updateTextInput(session,     "edit_tags",         value = row$tags)
     updateTextAreaInput(session, "edit_notes",        value = row$notes)
-    updateTabsetPanel(session, "main_tabs", selected = "Edit selected post")
+    updateTabsetPanel(session, "main_tabs", selected = "edit_tab")
   })
 
   observeEvent(input$save_changes, {
@@ -526,7 +611,17 @@ server <- function(input, output, session) {
     i  <- match(selected_post_id(), df$post_id)
     req(!is.na(i))
 
-    norm_date <- function(x) if (is.null(x) || is.na(x) || x == "") NA else as.character(as.Date(x))
+    norm_date <- function(x) {
+      if (is.null(x)) return(NA_character_)
+      if (length(x) == 0) return(NA_character_)
+      if (is.na(x[1])) return(NA_character_)
+      if (trimws(as.character(x[1])) == "") return(NA_character_)
+      
+      tryCatch(
+        as.character(as.Date(x[1])),
+        error = function(e) NA_character_
+      )
+    }
 
     df$title[i]         <- input$edit_title
     df$lead_quote[i]    <- input$edit_lead_quote
@@ -543,10 +638,14 @@ server <- function(input, output, session) {
 
     write_blog_registry(df)
     blog_data(read_blog_registry())
+    has_unsaved_changes(FALSE)
+    original_form_data(NULL)
   })
 
   observeEvent(input$clear_form, {
     selected_post_id(NULL)
+    has_unsaved_changes(FALSE)
+    original_form_data(NULL)
     updateTextInput(session,     "edit_title",          value = "")
     updateTextAreaInput(session, "edit_lead_quote",     value = "")
     updateTextAreaInput(session, "edit_gist",           value = "")

@@ -1,0 +1,35 @@
+---
+title: "Trump inadvertently helped promote renewables worldwide"
+description: "One or two sentence summary of the post, shown in the listing page."
+author: "Kenneth Westrick"
+date: 2026-07-29
+post_id: 55
+categories: [Leadership & Ethics, Geopolitics, Immigration, Economics, Saving Democracy, Science & Technology, Global Environment, Future]
+image: images/featured-image.png
+draft: true
+---
+
+## Introduction
+
+Start writing here.
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+```
+
+## Section Heading
+
+```{r}
+#| label: example-chart
+#| fig-cap: "Chart caption goes here."
+
+# Reference figures, charts, and data files directly from this
+# post's own directory, e.g. read_csv("raw_data.csv")
+```
+
+## Conclusion
+
+Wrap up here.

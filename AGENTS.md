@@ -2,7 +2,7 @@
 
 ## Overview
 
-Quarto website blog with a Shiny dashboard for editorial workflow management. Approximately 53 posts tracked in a CSV registry.
+Quarto website blog with a Shiny dashboard for editorial workflow management. 54 posts tracked in a CSV registry.
 
 ## Key files
 
@@ -70,4 +70,24 @@ post_data <- read_csv("docs/blog_registry.csv", show_col_types = FALSE)
 
 ## Reference data
 
-`docs/LFTF Posts Topics.docx.md` — original markdown table from which the 52 post titles were extracted and populated into the registry.
+`docs/LFTF Posts Topics.docx.md` — original markdown table from which the 54 post titles were extracted and populated into the registry.
+
+## Session notes (2026-07-29)
+
+- Added new post: "An Antiquated 'Maginot Line' Approach to Foreign Policy" (post_id 54, in draft)
+- Added example post for testing document icon (post_id 53, in drafting)
+- Cleaned up: archived duplicate skeleton post (`2026-07-25-trumps-maginot-line-approach-to-foreign-policy`)
+- Registry synced and Shiny bundle updated; working tree clean
+- Ready for next deployment when Maginot post is complete
+- Set up LaunchAgent to auto-run Shiny app on system startup (`localhost:3838`)
+
+## Feature backlog
+
+### Next: Prioritize active posts in Posts tab
+Reorder the Posts tab table to place "active" posts (status = `drafting`, `editing`, or `scheduled`) at the top of the stack, with inactive/completed posts below. This makes it easier to focus on work-in-progress items.
+
+Implementation notes:
+- Modify the data loading/sorting logic in `shiny/app.R` to reorder rows
+- Define "active" as status in: `drafting`, `editing`, `scheduled`
+- Within each group, maintain existing sort order (or add secondary sort if desired)
+- Should work with existing filters (status, publication, search)
