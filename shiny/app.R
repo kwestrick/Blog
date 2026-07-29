@@ -122,6 +122,10 @@ main_ui <- fluidPage(
         textInput("new_post_title", "New post title"),
         actionButton("scaffold_post", "Create new post"),
         textOutput("scaffold_status"),
+        br(), br(),
+        actionButton("upload_to_cloud", "↑ Upload to Cloud", class = "btn-success", width = "100%"),
+        br(),
+        textOutput("upload_status"),
         br(), br()
       ),
 
@@ -393,6 +397,31 @@ server <- function(input, output, session) {
       write_blog_registry(df)
       blog_data(read_blog_registry())
     })
+
+    upload_msg <- reactiveVal("")
+
+    observeEvent(input$upload_to_cloud, {
+      upload_msg("Uploading...")
+      tryCatch({
+        # Copy local registry to the shiny bundle
+        file.copy("../docs/blog_registry.csv", "blog_registry.csv", overwrite = TRUE)
+        
+        # Deploy to Connect Cloud
+        rsconnect::deployApp(
+          appDir = ".",
+          appTitle = "Blog Editorial Dashboard",
+          account = "westeva",
+          server = "connect.posit.cloud",
+          forceUpdate = TRUE
+        )
+        
+        upload_msg("✓ Upload complete! Cloud version updated.")
+      }, error = function(e) {
+        upload_msg(paste("✗ Upload failed:", conditionMessage(e)))
+      })
+    })
+
+    output$upload_status <- renderText({ upload_msg() })
   }
 
   # ── Filtered data ───────────────────────────────────────────────────────────

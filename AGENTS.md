@@ -80,14 +80,17 @@ post_data <- read_csv("docs/blog_registry.csv", show_col_types = FALSE)
 - Registry synced and Shiny bundle updated; working tree clean
 - Ready for next deployment when Maginot post is complete
 - Set up LaunchAgent to auto-run Shiny app on system startup (`localhost:3838`)
-
-## Feature backlog
-
-### Next: Prioritize active posts in Posts tab
-Reorder the Posts tab table to place "active" posts (status = `drafting`, `editing`, or `scheduled`) at the top of the stack, with inactive/completed posts below. This makes it easier to focus on work-in-progress items.
-
-Implementation notes:
-- Modify the data loading/sorting logic in `shiny/app.R` to reorder rows
-- Define "active" as status in: `drafting`, `editing`, `scheduled`
-- Within each group, maintain existing sort order (or add secondary sort if desired)
-- Should work with existing filters (status, publication, search)
+  - LaunchAgent plist: `~/Library/LaunchAgents/com.kwestrick.blog-shiny.plist`
+  - Launch script: `launch_shiny.R` in blog root
+  - Logs: `/tmp/blog-shiny.log` and `/tmp/blog-shiny-error.log`
+- Implemented unsaved changes detection in Edit tab:
+  - Asterisk (*) appended to "Edit selected post" tab title when changes are pending
+  - Confirmation dialog when navigating back to Posts with unsaved changes
+  - Uses `original_form_data` reactiveVal to compare against current inputs
+- Fixed "Save changes" crash: `norm_date()` now uses `tryCatch` and `[1]` indexing to handle bad date inputs
+- Implemented status-based sort order in Posts tab: editing → drafting → scheduled → idea → published → unassigned
+  - Sort applied in `filtered_data()` reactive
+  - Hidden `status_priority` column (integer 1–6) added to DataTable for column-click sorting
+  - `orderData = 1` in columnDefs ties Status column clicks to the hidden priority column
+  - `rownames = FALSE` required on datatable call — DT's default `rownames = TRUE` inserts a hidden JS column at index 0, shifting all indices
+- Fixed post title links not opening Edit tab: tab now has explicit `value = "edit_tab"` since dynamic `uiOutput` title broke string-based `updateTabsetPanel` lookup
