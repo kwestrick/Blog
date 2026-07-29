@@ -70,15 +70,14 @@ post_data <- read_csv("docs/blog_registry.csv", show_col_types = FALSE)
 
 ## Reference data
 
-`docs/LFTF Posts Topics.docx.md` — original markdown table from which the 54 post titles were extracted and populated into the registry.
+`docs/LFTF Posts Topics.docx.md` — original markdown table from which post titles were extracted and populated into the registry.
 
 ## Session notes (2026-07-29)
 
-- Added new post: "An Antiquated 'Maginot Line' Approach to Foreign Policy" (post_id 54, in draft)
-- Added example post for testing document icon (post_id 53, in drafting)
+- Registry at 48 rows after sync; post IDs 11–14 and 21–22 absent (likely deleted in prior cloud sessions)
+- Added new post: "An Antiquated 'Maginot Line' Approach to Foreign Policy" (post_id 54, in draft — intro written, needs chart + conclusion)
+- Added new post: "Trump inadvertently helped promote renewables worldwide" (post_id 55, status: editing)
 - Cleaned up: archived duplicate skeleton post (`2026-07-25-trumps-maginot-line-approach-to-foreign-policy`)
-- Registry synced and Shiny bundle updated; working tree clean
-- Ready for next deployment when Maginot post is complete
 - Set up LaunchAgent to auto-run Shiny app on system startup (`localhost:3838`)
   - LaunchAgent plist: `~/Library/LaunchAgents/com.kwestrick.blog-shiny.plist`
   - Launch script: `launch_shiny.R` in blog root
@@ -94,3 +93,9 @@ post_data <- read_csv("docs/blog_registry.csv", show_col_types = FALSE)
   - `orderData = 1` in columnDefs ties Status column clicks to the hidden priority column
   - `rownames = FALSE` required on datatable call — DT's default `rownames = TRUE` inserts a hidden JS column at index 0, shifting all indices
 - Fixed post title links not opening Edit tab: tab now has explicit `value = "edit_tab"` since dynamic `uiOutput` title broke string-based `updateTabsetPanel` lookup
+- Added "↑ Upload to Cloud" button (local sidebar only): copies registry to shiny bundle and redeploys to Connect Cloud in one click
+- Deployed to Connect Cloud — live and up to date
+
+## Feature backlog
+
+- **Maginot Line post** (post_id 54): draft in progress — intro written, chart section and conclusion need completing
